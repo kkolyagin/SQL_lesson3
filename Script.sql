@@ -87,4 +87,41 @@ select id from customers where driverslicense=true;
 select customerid from bonuses where value = 'D' or value ='E';
 --Выведите самую высокую зарплату в компании.
 select max(salary) from customers;
+--Выведите название самого крупного отдела
+select title from departments order by customerscount desc fetch first 1 rows only; 
+--Выведите номера сотрудников от самых опытных до вновь прибывших
+ select id, (date_part('year', current_date)- date_part('year',firstday)) as stage  from customers order by stage desc;
+--Рассчитайте среднюю зарплату для каждого уровня сотрудников
+select titlelevel, sum(salary) from customers group by titlelevel;
+/*Добавьте столбец с информацией о коэффициенте годовой премии к основной таблице. 
+ Коэффициент рассчитывается по такой схеме: базовое значение коэффициента – 1, каждая оценка действует на коэффициент так:
+         Е – минус 20%
+         D – минус 10%
+         С – без изменений
+         B – плюс 10%
+         A – плюс 20%
+Соответственно, сотрудник с оценками А, В, С, D – должен получить коэффициент 1.2.*/
+alter table customers add column ratio float4;
+update customers set ratio = 1;
 
+update customers set ratio = ratio + 0.2 where id in (select customerid from bonuses where value = 'A' and quarterofyear=1);
+update customers set ratio = ratio + 0.2 where id in (select customerid from bonuses where value = 'A' and quarterofyear=2);
+update customers set ratio = ratio + 0.2 where id in (select customerid from bonuses where value = 'A' and quarterofyear=3);
+update customers set ratio = ratio + 0.2 where id in (select customerid from bonuses where value = 'A' and quarterofyear=4);
+
+update customers set ratio = ratio + 0.1 where id in (select customerid from bonuses where value = 'B' and quarterofyear=1);
+update customers set ratio = ratio + 0.1 where id in (select customerid from bonuses where value = 'B' and quarterofyear=2);
+update customers set ratio = ratio + 0.1 where id in (select customerid from bonuses where value = 'B' and quarterofyear=3);
+update customers set ratio = ratio + 0.1 where id in (select customerid from bonuses where value = 'B' and quarterofyear=4);
+
+update customers set ratio = ratio - 0.1 where id in (select customerid from bonuses where value = 'D' and quarterofyear=1);
+update customers set ratio = ratio - 0.1 where id in (select customerid from bonuses where value = 'D' and quarterofyear=2);
+update customers set ratio = ratio - 0.1 where id in (select customerid from bonuses where value = 'D' and quarterofyear=3);
+update customers set ratio = ratio - 0.1 where id in (select customerid from bonuses where value = 'D' and quarterofyear=4); 
+
+update customers set ratio = ratio - 0.2 where id in (select customerid from bonuses where value = 'E' and quarterofyear=1);
+update customers set ratio = ratio - 0.2 where id in (select customerid from bonuses where value = 'E' and quarterofyear=2);
+update customers set ratio = ratio - 0.2 where id in (select customerid from bonuses where value = 'E' and quarterofyear=3);
+update customers set ratio = ratio - 0.2 where id in (select customerid from bonuses where value = 'E' and quarterofyear=4); 
+
+--select customerid, count(quarterofyear)*0.2 as delta  from bonuses where value = 'A' group by customerid order by customerid
