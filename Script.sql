@@ -93,7 +93,8 @@ select employeesid from bonuses where value = 'D' or value ='E';
 --Выведите самую высокую зарплату в компании.
 select max(salary) from employees;
 --Выведите название самого крупного отдела
-select title from departments order by employeescount desc fetch first 1 rows only; 
+--select title from departments order by employeescount desc fetch first 1 rows only;
+select title from departments where employeescount =(select max(employeescount) from departments) 
 --Выведите номера сотрудников от самых опытных до вновь прибывших
  select id, (date_part('year', current_date)- date_part('year',firstday)) as stage  from employees order by stage desc;
 --Рассчитайте среднюю зарплату для каждого уровня сотрудников
@@ -107,26 +108,16 @@ select titlelevel, sum(salary) from employees group by titlelevel;
          A – плюс 20%
 Соответственно, сотрудник с оценками А, В, С, D – должен получить коэффициент 1.2.*/
 alter table employees add column ratio float4;
-update employees set ratio = 1;
-
-update employees set ratio = ratio + 0.2 where id in (select employeesid from bonuses where value = 'A' and quarterofyear=1);
-update employees set ratio = ratio + 0.2 where id in (select employeesid from bonuses where value = 'A' and quarterofyear=2);
-update employees set ratio = ratio + 0.2 where id in (select employeesid from bonuses where value = 'A' and quarterofyear=3);
-update employees set ratio = ratio + 0.2 where id in (select employeesid from bonuses where value = 'A' and quarterofyear=4);
-
-update employees set ratio = ratio + 0.1 where id in (select employeesid from bonuses where value = 'B' and quarterofyear=1);
-update employees set ratio = ratio + 0.1 where id in (select employeesid from bonuses where value = 'B' and quarterofyear=2);
-update employees set ratio = ratio + 0.1 where id in (select employeesid from bonuses where value = 'B' and quarterofyear=3);
-update employees set ratio = ratio + 0.1 where id in (select employeesid from bonuses where value = 'B' and quarterofyear=4);
-
-update employees set ratio = ratio - 0.1 where id in (select employeesid from bonuses where value = 'D' and quarterofyear=1);
-update employees set ratio = ratio - 0.1 where id in (select employeesid from bonuses where value = 'D' and quarterofyear=2);
-update employees set ratio = ratio - 0.1 where id in (select employeesid from bonuses where value = 'D' and quarterofyear=3);
-update employees set ratio = ratio - 0.1 where id in (select employeesid from bonuses where value = 'D' and quarterofyear=4); 
-
-update employees set ratio = ratio - 0.2 where id in (select employeesid from bonuses where value = 'E' and quarterofyear=1);
-update employees set ratio = ratio - 0.2 where id in (select employeesid from bonuses where value = 'E' and quarterofyear=2);
-update employees set ratio = ratio - 0.2 where id in (select employeesid from bonuses where value = 'E' and quarterofyear=3);
-update employees set ratio = ratio - 0.2 where id in (select employeesid from bonuses where value = 'E' and quarterofyear=4); 
-
---select employeesid, count(quarterofyear)*0.2 as delta  from bonuses where value = 'A' group by employeesid order by `
+	
+update employees
+set ratio = s.ratio
+from (select y.employeesid, 1+sum(y.score) as ratio 
+		from ( select *, case when value='A' then 0.2
+							when value='B' then 0.1
+							when value='C' then 0
+							when value='D' then -0.1
+							when value='E' then -0.2
+							else 0 end as score
+				from bonuses) y 
+		group by y.employeesid) s
+where id = s.employeesid;
