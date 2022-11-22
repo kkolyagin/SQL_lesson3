@@ -1,8 +1,19 @@
--- 1. Создать таблицу с основной информацией о сотрудниках: ФИО, дата рождения, дата начала работы, должность, уровень сотрудника (jun, middle, senior, lead), уровень зарплаты, идентификатор отдела, наличие/отсутствие прав(True/False). При этом в таблице обязательно должен быть уникальный номер для каждого сотрудника.
+DO $$ BEGIN
+	create type grade_type as enum ('junior', 'middle', 'senior', 'lead');
+	create type bonus_type as enum ('A', 'B', 'C', 'D', 'E');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-create type grade_type as enum ('junior', 'middle', 'senior', 'lead');
-create type bonus_type as enum ('A', 'B', 'C', 'D', 'E');
-
+--2. Для будущих отчетов аналитики попросили вас создать еще одну таблицу с информацией по отделам – в таблице должен быть идентификатор для каждого отдела, название отдела (например. Бухгалтерский или IT отдел), ФИО руководителя и количество сотрудников.
+CREATE TABLE if not exists departments (
+	id int generated always as identity primary key,
+	title varchar(50) not NULL,
+	fiochief varchar(90),
+	employeescount int4 NULL
+);
+	
+-- 1. Создать таблицу с основной информацией о сотрудниках: ФИО, дата рождения, дата начала работы, должность, уровень сотрудника (jun, middle, senior, lead), уровень зарплаты, идентификатор отдела, наличие/отсутствие прав(True/False). При этом в таблице обязательно должен быть уникальный номер для каждого сотрудника.	
 CREATE TABLE if not exists employees (
 	id int generated always as identity primary key,
 	fio varchar(90) NOT NULL,
@@ -19,15 +30,8 @@ CREATE TABLE if not exists employees (
 		on delete cascade
 );
 
---2. Для будущих отчетов аналитики попросили вас создать еще одну таблицу с информацией по отделам – в таблице должен быть идентификатор для каждого отдела, название отдела (например. Бухгалтерский или IT отдел), ФИО руководителя и количество сотрудников.
-CREATE TABLE if not exists departments (
-	id int generated always as identity primary key,
-	title varchar(50) not NULL,
-	fiochief varchar(90),
-	employeescount int4 NULL
-);
 --3. На кону конец года и необходимо выплачивать сотрудникам премию. Премия будет выплачиваться по совокупным оценкам, которые сотрудники получают в каждом квартале года. Создайте таблицу, в которой для каждого сотрудника будут его оценки за каждый квартал. Диапазон оценок от A – самая высокая, до E – самая низкая.
-CREATE TABLE bonuses (
+CREATE TABLE if not exists bonuses (
 	id int generated always as identity primary key,
 	employeesid integer,
 	quarterofyear integer, 
@@ -82,10 +86,10 @@ values
 
 --6. Теперь пришла пора анализировать наши данные – напишите запросы для получения следующей информации:
 -- Уникальный номер сотрудника, его ФИО и стаж работы – для всех сотрудников компании
-select id, fio, (date_part('year', current_date)- date_part('year',firstday)) as stage  from employees;
+select id, fio, ((current_date -firstday)/365 || ' лет. ' || (current_date -firstday)% 365/30 || ' мес.') as stage  from employees;
 
 --Уникальный номер сотрудника, его ФИО и стаж работы – только первых 3-х сотрудников
-select id, fio, (date_part('year', current_date)- date_part('year',firstday)) as stage  from employees fetch first 3 rows only;
+select id, fio, ((current_date -firstday)/365 || ' лет. ' || (current_date -firstday)% 365/30 || ' мес.') as stage  from employees limit 3;
 --Уникальный номер сотрудников - водителей
 select id from employees where driverslicense=true;
 --Выведите номера сотрудников, которые хотя бы за 1 квартал получили оценку D или E
@@ -94,11 +98,11 @@ select employeesid from bonuses where value = 'D' or value ='E';
 select max(salary) from employees;
 --Выведите название самого крупного отдела
 --select title from departments order by employeescount desc fetch first 1 rows only;
-select title from departments where employeescount =(select max(employeescount) from departments) 
+select title from departments where employeescount =(select max(employeescount) from departments);
 --Выведите номера сотрудников от самых опытных до вновь прибывших
- select id, (date_part('year', current_date)- date_part('year',firstday)) as stage  from employees order by stage desc;
+select b.id from (select id, cast((current_date-firstday) as float)/365 as stage  from employees order by stage desc) b;
 --Рассчитайте среднюю зарплату для каждого уровня сотрудников
-select titlelevel, sum(salary) from employees group by titlelevel;
+select titlelevel, sum(salary)/count(salary) as mid_salary from employees group by titlelevel;
 /*Добавьте столбец с информацией о коэффициенте годовой премии к основной таблице. 
  Коэффициент рассчитывается по такой схеме: базовое значение коэффициента – 1, каждая оценка действует на коэффициент так:
          Е – минус 20%
